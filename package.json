@@ -1,6 +1,6 @@
 {
   "name": "encrypted-kkk",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Send encrypted messages on kekeke.cc",
   "main": "main.js",
   "scripts": {

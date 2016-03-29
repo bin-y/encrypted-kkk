@@ -57,7 +57,7 @@ function loadPublicId() {
     console.log(xmlHttp.responseText);
     if (xmlHttp.responseText.indexOf('//OK') != 0)
         return;
-    var dataobj = eval(xmlHttp.responseText.substring(4));
+    var dataobj = JSON.parse(xmlHttp.responseText.substring(4));
 
     var squareinfo = dataobj[dataobj.length - 3];
     console.log(squareinfo);

@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Encrypted kekeke</title>
+</head>
+
+<body>
+    <h1>Encrypted kekeke</h1>
+    <label>Room:</label>
+    <input id="roomNameInput"/>
+    <input id="enterRoomButton" type="button" value="join chat"/>
+    <input id="createChatButton" type="button" value="create chat"/>
+</body>
+<script>
+    const remote = require('electron').remote;
+    const crypto = require('crypto');
+    const BrowserWindow = remote.BrowserWindow;
+    
+    function openChatWindow(roomName) {
+        var chatWindow = new BrowserWindow({
+            width: 800,
+            height: 600,
+            nodeIntegration: false,
+            preload: __dirname + '/inject.js'
+        });
+        chatWindow.loadURL('https://kekeke.cc/' + roomName);
+        
+        remote.getCurrentWindow().hide();
+        chatWindow.on('closed', function() {
+            // Dereference the window object, usually you would store windows
+            // in an array if your app supports multi windows, this is the time
+            // when you should delete the corresponding element.
+            remote.getCurrentWindow().close();
+        });
+    }
+    enterRoomButton.onclick = function() {
+        if (roomNameInput.value != '') {
+            openChatWindow(roomNameInput.value);
+        }
+    }
+    createChatButton.onclick = function() {
+        openChatWindow(crypto.randomBytes(8).toString('hex'));
+    }
+</script>
+
+</html>

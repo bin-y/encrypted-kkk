@@ -1,0 +1,29 @@
+{
+  "name": "encrypted-kkk",
+  "version": "1.0.0",
+  "description": "Send encrypted messages on kekeke.cc",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bin-y/encrypted-kkk.git"
+  },
+  "keywords": [
+    "ECC",
+    "ECIES",
+    "encrypt",
+    "chat"
+  ],
+  "author": "Bin.Y",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/bin-y/encrypted-kkk/issues"
+  },
+  "homepage": "https://github.com/atom/bin-y/encrypted-kkk#readme",
+  "dependencies": {
+    "bitcore-lib": "",
+    "bitcore-ecies": ""
+  }
+}

@@ -21,6 +21,8 @@ var cypher;
 var publicId;
 var publicIdInitialized = false;
 var keySenderPublicId;
+var messageInputField;
+var submitInputButton;
 
 localStorage['hiroba.nickname'] = crypto.randomBytes(4).toString('hex');
 
@@ -128,6 +130,9 @@ window.fakehirobaWebSocketOnMessage = function (a) {
                     keySenderPublicId = msgobj.senderPublicId;
                     sendPublicKey();
                     publicKeyAcquired = true;
+                    submitInputButton.disabled = false;
+                    messageInputField.disabled = false;
+                    messageInputField.value = '';
                     return;
                 }
             } catch (err) {
@@ -209,6 +214,11 @@ window.start = function () {
     window.realhirobaWebSocketOnMessage = window.hirobaWebSocketOnMessage;
     window.hirobaWebSocketOnMessage = window.fakehirobaWebSocketOnMessage;
 
+    messageInputField = document.querySelector('.SquareCssResource-messageInputField');
+    submitInputButton = document.querySelector('.SquareCssResource-submitInputButton Button');
+    submitInputButton.disabled = true;
+    messageInputField.disabled = true;
+    messageInputField.value = 'Public key not exchanged, please wait...';
     return;
 }
 

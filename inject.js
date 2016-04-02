@@ -89,6 +89,22 @@ function loadPublicId() {
     console.log('publicId:', publicId)
 }
 
+function showHint(hint) {
+    var msgobj = {
+        'senderPublicId': '',
+        'senderNickName': 'HINT',
+        'anchorUsername': '',
+        'content': hint,
+        'date': '' + Date.now(),
+        'eventType': 'KEKE_MESSAGE',
+        'payload': {
+            'replyPublicIds': [publicId]
+        }
+    };
+
+    window.realhirobaWebSocketOnMessage(recvHeader + JSON.stringify(msgobj));
+}
+
 function createAndShowToken() {
     var msgobj = {
         'senderPublicId': '',
@@ -98,7 +114,7 @@ function createAndShowToken() {
         'date': '' + Date.now(),
         'eventType': 'KEKE_MESSAGE',
         'payload': {
-            'replyPublicIds': []
+            'replyPublicIds': [publicId]
         }
     };
 
@@ -112,6 +128,7 @@ function createAndShowToken() {
 
     msgobj.content = TOKEN.create(tokenParameter).toString('base64');
     window.realhirobaWebSocketOnMessage(recvHeader + JSON.stringify(msgobj));
+    showHint('Share token to your partner and wait for him to join.')
 }
 
 function sendPublicKey() {
@@ -123,7 +140,7 @@ function sendPublicKey() {
         'date': '' + Date.now(),
         'eventType': 'KEKE_MESSAGE',
         'payload': {
-            'replyPublicIds': []
+            'replyPublicIds': [publicId]
         }
     };
     sendobj.content = ecdh.getPublicKey('base64', eciesEncryptionOptions.keyFormat);
@@ -173,6 +190,7 @@ window.fakehirobaWebSocketOnMessage = function(message) {
         else {
             var buffer = new Buffer(msgobj.content, 'base64');
             if (!publicKey) {
+
                 eciesDecryptionOptions.s1 = new Buffer(msgobj.senderPublicId, 'hex');
 
                 try {
@@ -183,6 +201,8 @@ window.fakehirobaWebSocketOnMessage = function(message) {
                     eciesEncryptionOptions.s2 = new Buffer(msgobj.senderPublicId, 'hex');
                     keySenderPublicId = msgobj.senderPublicId;
                     inputArea.hidden = false;
+
+                    showHint('Your partner has joined in, enjoy your encrypted chat.')
                     return;
                 } catch (err) {
                     console.log(err.message);

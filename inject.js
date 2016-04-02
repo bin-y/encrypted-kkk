@@ -57,7 +57,9 @@ function loadPublicId() {
     console.log(xmlHttp.responseText);
     if (xmlHttp.responseText.indexOf('//OK') != 0)
         return;
-    var dataobj = JSON.parse(xmlHttp.responseText.substring(4));
+    var dataString = xmlHttp.responseText.substring(4);
+    dataString = dataString.replace(/\'/g, '"');
+    var dataobj = JSON.parse(dataString);
 
     var squareinfo = dataobj[dataobj.length - 3];
     console.log(squareinfo);
@@ -187,7 +189,7 @@ window.start = function () {
     if (!publicIdInitialized) {
         if (gwtIframe == null) {
             console.log('Waiting gwtIframe...');
-            setTimeout('start();', 500);
+            setTimeout('start();', 100);
             return;
         }
         try {
@@ -202,7 +204,8 @@ window.start = function () {
 
     if (window.hirobaWs == null
         || window.hirobaWs.send == null
-        ) {
+        || window.hirobaWebSocketOnMessage == null
+    ) {
         console.log('Waiting ws...');
         setTimeout('start();', 100);
         return;
@@ -222,4 +225,3 @@ window.start = function () {
     return;
 }
 
-setTimeout('window.start();', 500);

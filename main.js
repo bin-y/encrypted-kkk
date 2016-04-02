@@ -12,10 +12,10 @@ const BrowserWindow = electron.BrowserWindow;
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
 
-
-var deleteFolderRecursive = function(path) {
+// delete session
+var deleteFolderRecursive = function (path) {
     if (fs.existsSync(path)) {
-        fs.readdirSync(path).forEach(function(file, index) {
+        fs.readdirSync(path).forEach(function (file, index) {
             var curPath = path + "/" + file;
             if (fs.lstatSync(curPath).isDirectory()) { // recurse
                 deleteFolderRecursive(curPath);
@@ -34,7 +34,7 @@ try {
 }
 
 // remove old chat sessions
-fs.readdirSync(sessionDirectory).forEach(function(file, index) {
+fs.readdirSync(sessionDirectory).forEach(function (file, index) {
     var curPath = sessionDirectory + file;
     if (fs.lstatSync(curPath).isDirectory()) {
         try {
@@ -65,10 +65,17 @@ function createWindow() {
         height: 600
     });
 
+    // make user agent looks like normal browser
+    var userAgent = mainWindow.webContents.getUserAgent();
+    userAgent = userAgent.replace(RegExp(app.getName() + '[^ ]+ '), '');
+    userAgent = userAgent.replace(/Electron[^ ]+ /, '');
+    global['userAgent'] = userAgent;
+    mainWindow.webContents.setUserAgent(userAgent);
+
     // and load the index.html of the app.
     mainWindow.loadURL('file://' + __dirname + '/index.html');
     // Emitted when the window is closed.
-    mainWindow.on('closed', function() {
+    mainWindow.on('closed', function () {
         // Dereference the window object, usually you would store windows
         // in an array if your app supports multi windows, this is the time
         // when you should delete the corresponding element.
@@ -81,7 +88,7 @@ function createWindow() {
 app.on('ready', createWindow);
 
 // Quit when all windows are closed.
-app.on('window-all-closed', function() {
+app.on('window-all-closed', function () {
     // On OS X it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
     if (process.platform !== 'darwin') {
@@ -89,7 +96,7 @@ app.on('window-all-closed', function() {
     }
 });
 
-app.on('activate', function() {
+app.on('activate', function () {
     // On OS X it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     if (mainWindow === null) {

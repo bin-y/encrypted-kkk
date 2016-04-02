@@ -1,6 +1,6 @@
 {
   "name": "encrypted-kkk",
-  "version": "0.0.1",
+  "version": "0.0.1-alpha.2",
   "description": "Send encrypted messages on kekeke.cc",
   "main": "main.js",
   "scripts": {
@@ -23,7 +23,6 @@
   },
   "homepage": "https://github.com/bin-y/encrypted-kkk#readme",
   "dependencies": {
-    "bitcore-lib": "",
-    "bitcore-ecies": ""
+    "standard-ecies": "^1.0.0"
   }
 }

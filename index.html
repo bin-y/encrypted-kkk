@@ -8,14 +8,15 @@
 
 <body>
     <h1>Encrypted kekeke</h1>
-    <label>Room:</label>
-    <input id="roomNameInput"/>
-    <input id="enterRoomButton" type="button" value="join chat"/>
-    <input id="createChatButton" type="button" value="create chat"/>
+    <label>Token:</label>
+    <input id="tokenInput" />
+    <input id="joinChatButton" type="button" value="join chat" />
+    <input id="createChatButton" type="button" value="create chat" />
 </body>
 <script>
     const remote = require('electron').remote;
     const crypto = require('crypto');
+    const TOKEN = remote.require('./token.js');
     const BrowserWindow = remote.BrowserWindow;
     
     function openChatWindow(roomName) {
@@ -25,24 +26,30 @@
             nodeIntegration: false,
             preload: __dirname + '/inject.js'
         });
+        chatWindow.webContents.setUserAgent(remote.getGlobal('userAgent'));
         chatWindow.loadURL('https://kekeke.cc/' + roomName);
-        
         remote.getCurrentWindow().hide();
         chatWindow.on('closed', function() {
-            // Dereference the window object, usually you would store windows
-            // in an array if your app supports multi windows, this is the time
-            // when you should delete the corresponding element.
             remote.getCurrentWindow().close();
         });
     }
-    enterRoomButton.onclick = function() {
-        if (roomNameInput.value != '') {
-            openChatWindow(roomNameInput.value);
+    joinChatButton.onclick = function() {
+        var tokenBuffer = new Buffer(tokenInput.value, 'base64');
+        
+        try {
+            if (TOKEN.load(tokenBuffer) == null) {
+                throw 'error';
+            }
+            openChatWindow(TOKEN.get().roomName);
+        } catch (err) {
+            alert('invalid token.');
         }
     }
     createChatButton.onclick = function() {
-        openChatWindow(crypto.randomBytes(8).toString('hex'));
+        openChatWindow('ENCRYPTED');
+        //openChatWindow(crypto.randomBytes(4).toString('hex'));
     }
+
 </script>
 
 </html>

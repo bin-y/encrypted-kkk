@@ -1,28 +1,51 @@
 ﻿const path = require('path');
 module.paths.push(path.resolve('node_modules'));
-const bitcore = require('bitcore-lib');
-const ECIES = require('bitcore-ecies');
+const ecies = require('standard-ecies');
 const crypto = require('crypto');
+const remote = require('electron').remote;
+const TOKEN = remote.require('./token.js');
 
-const ecies = new ECIES();
 const squareServiceHash = '258EDA4ABD8DB267D185D1DAB5F649E7';
-const roomName = decodeURIComponent(document.documentURI.split('/')[3]);
-const sendHeader = 'SEND\ndestination:/topic/' + roomName + '\n\n'
+const roomName = decodeURIComponent(window.location.pathname.substring(1));
+const sendHeader = 'SEND\ndestination:/topic/' + roomName + '\n\n';
 const recvHeader = 'MESSAGE\ndestination:/topic/' + roomName + '\npublisher:CLIENT_TRANSPORT\n\n';
 const saltedBlockSize = 32;
 const saltInditator = '\0';
+var totalMessageCount = 0;
 
-var privateKey = new bitcore.PrivateKey();
-var publicKeyBoradcasted = false;
+var eciesEncryptionOptions = {
+    hashName: 'sha256',
+    hashLength: 32,
+    macName: 'sha256',
+    macLength: 32,
+    curveName: 'secp256k1',
+    symmetricCypherName: 'aes-256-ecb',
+    iv: null, // iv is used in symmetric cipher, set null if cipher is in ECB mode.  
+    keyFormat: 'compressed',
+    s1: null, // optional shared information1 
+    s2: null // optional shared information2 
+};
+
+var eciesDecryptionOptions = {
+    hashName: 'sha256',
+    hashLength: 32,
+    macName: 'sha256',
+    macLength: 32,
+    curveName: 'secp256k1',
+    symmetricCypherName: 'aes-256-ecb',
+    iv: null, // iv is used in symmetric cipher, set null if cipher is in ECB mode.  
+    keyFormat: 'compressed',
+    s1: null, // optional shared information1 
+    s2: null // optional shared information2 
+};
+
+var ecdh = crypto.createECDH(eciesEncryptionOptions.curveName);
+ecdh.generateKeys();
 var publicKey;
-var publicKeyBuffer;
-var publicKeyAcquired = false;
-var cypher;
 var publicId;
 var publicIdInitialized = false;
 var keySenderPublicId;
-var messageInputField;
-var submitInputButton;
+var inputArea;
 
 localStorage['hiroba.nickname'] = crypto.randomBytes(4).toString('hex');
 
@@ -46,7 +69,6 @@ function getServiceRequestObject(service, async) {
 };
 
 function loadPublicId() {
-    console.log(localStorage['hiroba.anonymousId']);
     var postData = '7|0|8|https://kekeke.cc/com.liquable.hiroba.square.gwt.SquareModule/|' + squareServiceHash + '|com.liquable.hiroba.gwt.client.square.IGwtSquareService|startSquare|com.liquable.hiroba.gwt.client.square.StartSquareRequest/2186526774';
     postData += '|' + localStorage['hiroba.anonymousId'];
     postData += '|com.liquable.gwt.transport.client.Destination/2061503238';
@@ -54,7 +76,7 @@ function loadPublicId() {
     postData += '|1|2|3|4|1|5|5|6|0|7|8|';
     var xmlHttp = getServiceRequestObject('square', false);
     xmlHttp.send(postData);
-    console.log(xmlHttp.responseText);
+    console.log('startSquare response:', xmlHttp.responseText);
     if (xmlHttp.responseText.indexOf('//OK') != 0)
         return;
     var dataString = xmlHttp.responseText.substring(4);
@@ -62,15 +84,15 @@ function loadPublicId() {
     var dataobj = JSON.parse(dataString);
 
     var squareinfo = dataobj[dataobj.length - 3];
-    console.log(squareinfo);
+    console.log('squareinfo:', squareinfo);
     publicId = squareinfo[squareinfo.length - 1];
-    console.log(publicId)
+    console.log('publicId:', publicId)
 }
 
-function showStatus() {
+function createAndShowToken() {
     var msgobj = {
         'senderPublicId': '',
-        'senderNickName': 'STATUS',
+        'senderNickName': 'TOKEN',
         'anchorUsername': '',
         'content': '',
         'date': '' + Date.now(),
@@ -79,8 +101,16 @@ function showStatus() {
             'replyPublicIds': []
         }
     };
-    msgobj.content = 'public-key:' + privateKey.publicKey.toString() + '\n';
-    msgobj.content += 'room-name:' + roomName + '\n';
+
+    tokenParameter = {
+        roomName: roomName,
+        publicKey: ecdh.getPublicKey('base64', eciesEncryptionOptions.keyFormat),
+        publicId: publicId
+    };
+
+    console.log('token:', tokenParameter);
+
+    msgobj.content = TOKEN.create(tokenParameter).toString('base64');
     window.realhirobaWebSocketOnMessage(recvHeader + JSON.stringify(msgobj));
 }
 
@@ -89,32 +119,49 @@ function sendPublicKey() {
         'senderPublicId': publicId,
         'senderNickName': localStorage['hiroba.nickname'],
         'anchorUsername': '',
-        'content': privateKey.publicKey.toString(),
+        'content': '',
         'date': '' + Date.now(),
         'eventType': 'KEKE_MESSAGE',
         'payload': {
             'replyPublicIds': []
         }
     };
-    console.log(sendobj);
-    console.log(sendHeader + JSON.stringify(sendobj));
-    hirobaWs.realsend(sendHeader + JSON.stringify(sendobj));
+    sendobj.content = ecdh.getPublicKey('base64', eciesEncryptionOptions.keyFormat);
+    console.log('send publicKey:', sendobj.content);
+    console.log('encryption options:', eciesEncryptionOptions);
+    var message = sendHeader + JSON.stringify(sendobj);
+    // let fake send do encryption
+    hirobaWs.fakesend(message);
 }
 
-window.fakehirobaWebSocketOnMessage = function (a) {
-    var msgType = a.split('\n')[0];
+window.fakehirobaWebSocketOnMessage = function(message) {
+    console.log('received message:', message);
+    var msgType = message.split('\n')[0];
     if (msgType != 'MESSAGE')
-        return window.realhirobaWebSocketOnMessage(a);
+        return window.realhirobaWebSocketOnMessage(message);
     // msgType == MESSAGE    
 
-    if (!publicKeyBoradcasted) {
+
+    if (publicId == undefined) {
         loadPublicId();
-        showStatus();
-        sendPublicKey();
-        publicKeyBoradcasted = true;
+        eciesEncryptionOptions.s1 = new Buffer(publicId, 'hex');
+        eciesDecryptionOptions.s2 = new Buffer(publicId, 'hex');
+        if (TOKEN.get()) {
+            console.log('token:', TOKEN.get());
+            publicKey = new Buffer(TOKEN.get().publicKey, 'base64');
+            keySenderPublicId = TOKEN.get().publicId;
+            eciesEncryptionOptions.s2 = new Buffer(keySenderPublicId, 'hex');
+            eciesDecryptionOptions.s1 = new Buffer(keySenderPublicId, 'hex');
+            console.log('encrypt options:', eciesEncryptionOptions);
+            sendPublicKey();
+            inputArea.hidden = false;
+        }
+        else {
+            createAndShowToken();
+        }
     }
 
-    var msgContent = a.split('\n\n')[1];
+    var msgContent = message.split('\n\n')[1];
     var msgobj = JSON.parse(msgContent);
 
     if (msgobj.eventType == 'KEKE_MESSAGE'
@@ -123,68 +170,68 @@ window.fakehirobaWebSocketOnMessage = function (a) {
         if (msgobj.senderPublicId == publicId) {
             return;
         }
-        else if (!publicKeyAcquired) {
-            try {
-                if (bitcore.PublicKey.isValid(msgobj.content)) {
-                    publicKey = bitcore.PublicKey(msgobj.content);
-                    publicKeyBuffer = publicKey.toBuffer();
-                    cypher = ecies.privateKey(privateKey).publicKey(publicKey);
+        else {
+            var buffer = new Buffer(msgobj.content, 'base64');
+            if (!publicKey) {
+                eciesDecryptionOptions.s1 = new Buffer(msgobj.senderPublicId, 'hex');
+
+                try {
+                    console.log('decrypt options:', eciesDecryptionOptions);
+                    publicKey = ecies.decrypt(ecdh, buffer, eciesDecryptionOptions).toString();
+                    publicKey = new Buffer(publicKey.split(saltInditator)[0], 'base64');
+
+                    eciesEncryptionOptions.s2 = new Buffer(msgobj.senderPublicId, 'hex');
                     keySenderPublicId = msgobj.senderPublicId;
-                    sendPublicKey();
-                    publicKeyAcquired = true;
-                    submitInputButton.disabled = false;
-                    messageInputField.disabled = false;
-                    messageInputField.value = '';
+                    inputArea.hidden = false;
                     return;
+                } catch (err) {
+                    console.log(err.message);
                 }
-            } catch (err) {
-                console.log(err.message);
+            }
+            else if (keySenderPublicId == msgobj.senderPublicId) {
+                msgobj.content = ecies.decrypt(ecdh, buffer, eciesDecryptionOptions).toString();
+                msgobj.content = msgobj.content.split(saltInditator)[0];
+
+                message = recvHeader + JSON.stringify(msgobj);
             }
         }
-        else if (keySenderPublicId == msgobj.senderPublicId) {
-            console.log(msgobj);
-            var buffer = new Buffer(msgobj.content, 'base64');
-            buffer = Buffer.concat([publicKeyBuffer, buffer], publicKeyBuffer.length + buffer.length);
-            console.log(buffer);
-            msgobj.content = cypher.decrypt(buffer).toString().split(saltInditator)[0];
-            a = recvHeader + JSON.stringify(msgobj);
-        }
-        console.log(msgobj);
+        console.log('processed message:', msgobj);
     }
 
-    window.realhirobaWebSocketOnMessage(a);
+    window.realhirobaWebSocketOnMessage(message);
 }
 
-function fakesend(a) {
+function fakesend(message) {
+    console.log('sending message:', message);
     var msgobj = null;
     do {
-        if (a.indexOf('SEND\n') != 0)
+        if (message.indexOf('SEND\n') != 0)
             break;
-        msgobj = JSON.parse(a.split('\n\n')[1]);
+        msgobj = JSON.parse(message.split('\n\n')[1]);
         if (msgobj.eventType != 'CHAT_MESSAGE'
             && msgobj.eventType != 'KEKE_MESSAGE')
             break;
-        if (publicKeyAcquired) {
+        if (publicKey) {
             var unencryptedMessage = recvHeader + JSON.stringify(msgobj);
             window.realhirobaWebSocketOnMessage(unencryptedMessage);
             var buffer = new Buffer(msgobj.content + saltInditator);
-            buffer = Buffer.concat([buffer, new Buffer([0, 0])], buffer.length + 2);
             var saltLength = saltedBlockSize - (buffer.length % saltedBlockSize);
             buffer = Buffer.concat([buffer, crypto.randomBytes(saltLength)], buffer.length + saltLength);
-            buffer = cypher.encrypt(buffer);
-            console.log(buffer);
-            msgobj.content = buffer.slice(publicKeyBuffer.length).toString('base64');
-            console.log(msgobj.content);
-            a = sendHeader + JSON.stringify(msgobj);
+            buffer = ecies.encrypt(
+                publicKey,
+                buffer,
+                eciesEncryptionOptions
+            );
+            msgobj.content = buffer.toString('base64');
+            console.log('encrypted message:', msgobj.content);
+            message = sendHeader + JSON.stringify(msgobj);
         }
-        console.log(msgobj);
-        console.log(a);
+        console.log('modified message:', msgobj);
     } while (false);
-    console.log(a);
-    return hirobaWs.realsend(a);
+    return hirobaWs.realsend(message);
 };
 
-window.start = function () {
+window.start = function() {
     var gwtIframe = document.getElementById('com.liquable.hiroba.square.gwt.SquareModule');
     if (!publicIdInitialized) {
         if (gwtIframe == null) {
@@ -195,7 +242,7 @@ window.start = function () {
         try {
             window.gwtWnd = gwtIframe.contentWindow;
             window.gwtDoc = gwtIframe.contentDocument;
-            gwtIframe.contentWindow.removeChild = function () { };
+            gwtIframe.contentWindow.removeChild = function() { };
         } catch (err) {
             console.log(err.message);
         }
@@ -217,11 +264,9 @@ window.start = function () {
     window.realhirobaWebSocketOnMessage = window.hirobaWebSocketOnMessage;
     window.hirobaWebSocketOnMessage = window.fakehirobaWebSocketOnMessage;
 
-    messageInputField = document.querySelector('.SquareCssResource-messageInputField');
-    submitInputButton = document.querySelector('.SquareCssResource-submitInputButton Button');
-    submitInputButton.disabled = true;
-    messageInputField.disabled = true;
-    messageInputField.value = 'Public key not exchanged, please wait...';
+    inputArea = document.querySelector('table.SquareCssResource-inputArea');
+    inputArea.hidden = true;
     return;
 }
 
+setTimeout('window.start();', 500);
